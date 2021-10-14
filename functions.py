@@ -6,8 +6,50 @@ import time
 from datetime import datetime
 import socket
 import os
+import serial 
+
 
 #----------------------------------------------- Functions -------------------------------------------------#
+
+
+#------------------------------------ User or GPS Input ---------------------------------------#
+
+def userOrGPS():
+
+    global x
+    resetPrompt = str(input("Press U For User Coordinates Input \nPress G for GPS Input : "))
+    while True:
+        if resetPrompt != "U" and resetPrompt != "G":       # User input incorrect --> stay in While loop
+            resetPrompt = str(input("Nope ! Press U or G : "))
+        if resetPrompt == "U" :        # User input correct --> exit While loop and return M or A  
+            x = 10
+            break
+        if resetPrompt == "G":
+            x = 1
+            break
+    return x
+
+
+#------------------------------------ User Lon Lat Input is a Number Validation ---------------------------------------#
+
+def lonLatInput(stringLonOrLat,i):                                              # My circleCoord() function creates a circle using the metric system, 
+                                                                # I must therefore convert my nautical miles to meters,
+                                                                # 1 nautical mile = 1852 meters
+    while True:
+        lonOrLat = input("Boat%d %s: " %(i,stringLonOrLat))
+        try:
+            val = int(lonOrLat)
+            # print("%s is an Integer Number = " %stringLonOrLat, val )        # Nautical miles as an integer is accepted 
+            break
+        except ValueError:
+            try:
+                val = float(lonOrLat)
+                # print("%s is a Float Number = " %stringLonOrLat, val )      # Nautical miles as a float is accepted 
+                break
+            except ValueError:
+                print("This is not a number. Please enter a valid number") # Nautical miles as any other class/type is not accepted 
+    return val
+
 
 
 #-------------------------------- Create Circle from Centre Coordinates ----------------------------------------#
@@ -73,8 +115,8 @@ def radiusMulticircles(radiusUserInput):
     listMultiplicateur = [1,2,4]
     for i in range(len(listMultiplicateur)):
         listRadius.append(radiusUserInput*listMultiplicateur[i]) # Multiply the input radius by 1,2 and 4
-    listRadius.insert(0,300)                  # The first radius in this list corresponds to the smallest circle used to locate the boat     
-    # print(listRadius)                       # The output is expressed in meters not in nautical miles 
+    listRadius.insert(0,300)                                     # The first radius in this list corresponds to the smallest circle used to locate the boat     
+    # print(listRadius)                                          # The output is expressed in meters not in nautical miles 
     return listRadius 
 
 #------------------------------------ Create Multiple Circle (for Routeur) ---------------------------------------#
@@ -88,8 +130,9 @@ def kmlMultiCircles(listRadius,N,lat,lon,circleColor):
     # Create Multiple Polygons and put them in a list 
     circle1 = kml.newmultigeometry(name="Circle1") 
     circle2 = kml.newmultigeometry(name="Circle2") 
-    circle3 = kml.newmultigeometry(name="Circle1") 
-    circle4 = kml.newmultigeometry(name="Circle2") 
+    circle3 = kml.newmultigeometry(name="Circle3") 
+    circle4 = kml.newmultigeometry(name="Circle4") 
+    # point1 =  kml.newmultigeometry(name="Point1") 
 
     listCircles = [circle1,circle2,circle3,circle4] 
 
@@ -97,12 +140,41 @@ def kmlMultiCircles(listRadius,N,lat,lon,circleColor):
 
     for i in range(len(listRadius)):
         listCoord.append(circleCoord(listRadius[i],N,lat,lon))
-        listCircles[i].newpolygon(outerboundaryis=listCoord[i])
-        listCircles[i].style.polystyle.color = '007f7f7f'
+        listCircles[i].newpolygon(outerboundaryis=listCoord[i],innerboundaryis=listCoord[i]) # Putting the inner and outer boundaries the same removes the inside coloring
+        # listCircles[i].style.polystyle.color = '007f7f7f'
+        listCircles[i].style.polystyle.fill = 0
         listCircles[i].style.linestyle.color = circleColor
+    # point1.newpoint(coords=[(lon, lat)])
     # print(listRadius)
     # print(listCoord)
     # print(listCircles)
+    kml.save("MyPolygon.kml")
+    return 
+
+
+#------------------------------------ Create Multiple Circles for Multiple Boats (for Routeur) ---------------------------------------#
+
+def kmlMultiBoats(N,nbBoats):  
+
+    kml = simplekml.Kml()
+
+    # Creating MultiGeometry
+    multiBoat = kml.newmultigeometry(name="MultiPoint") 
+    radius = radiusInput()                      # Outer radius of the donut (user input)
+    listRadius = radiusMulticircles(radius)     # List of radius all the plotted circles  
+
+    for i in range(0,nbBoats,1):
+        lonBoat = lonLatInput('lon',i)
+        latBoat = lonLatInput('lat',i)
+
+        boatCircles = []
+        for i in range(len(listRadius)):
+            x = circleCoord(listRadius[i],N,latBoat,lonBoat)
+            boatCircles.append(x)
+            multiBoat.newpolygon(outerboundaryis=x,innerboundaryis=x)
+            multiBoat.style.polystyle.fill = 0
+            multiBoat.style.linestyle.color = '99000000'
+
     kml.save("MyPolygon.kml")
     return 
 
@@ -112,7 +184,7 @@ def kmlMultiCircles(listRadius,N,lat,lon,circleColor):
 def seleniumWindy(browser,reset,autoOrManual,sleepTime):
 
     #------------------------------------ SUPER IMPORTANT ---------------------------------------#
-    x = 1
+    x = 2
 
     kmlDirectory = os.getcwd()                                                     # Automatically find the path of the file in whiwh the Python Script is run 
     kmlDirectory = kmlDirectory[:2] + "\\" + kmlDirectory[2:] + "\\MyPolygon.kml"  # Create the appropriate path that Selenium can read
@@ -146,7 +218,7 @@ def seleniumWindy(browser,reset,autoOrManual,sleepTime):
             if resetPrompt != "y" and resetPrompt != "init":
                 resetPrompt = str(input("Type y or Ctrl + C or init:"))
             if resetPrompt == "y":                    # Refresh
-                x = 1
+                x = 2
                 break
             if resetPrompt == "init":                 # ReConfig Radius, Colour and Automation Mode
                 x = 0
@@ -181,7 +253,7 @@ def decodeGPRMC(stringGPRMC):
     
 
 
-def decodeLonLat(Lon,Lat,LonDir,LatDir):
+def decodeLonLat(Lon,Lat,LonDir,LatDir):             # Decode lon and lat from GPRMC Sentence 
     decodedData = {}                                 # Create an empty Dict that will be filled in by the functions below 
 
     if LonDir == "W":                                # Translate West and East Values with Neg and Poq Values respectively 
@@ -236,7 +308,8 @@ def time2utc(times):
 
 #------------------------------------ UDP Receiver ---------------------------------------#
 
-def receiveUDP(ip,port):                           # The following function allows us to retrieve the message sent over UDP 
+def receiveUDP(ip,port):                            # The following function allows us to retrieve the message sent over UDP 
+
     sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
     sock.bind((ip, port))
 
@@ -258,6 +331,7 @@ def receiveUDP(ip,port):                           # The following function allo
 #------------------------------------ Color Dictionary ---------------------------------------#
 
 def colorDict():
+
     colors = ['Red (R)','Orange (O)','Yellow (Y)','Green (G)','Light Blue (LB)', 'Dark Blue (DB)','Purple (P)','Pink (PK)'] # A list of colors for the user to choose from
     print(colors)
 
@@ -279,6 +353,7 @@ def colorDict():
 #------------------------------------ User Color Input converted to HEX Code ---------------------------------------#
 
 def colorInput(colorDictionary):
+
     colorChosen = str(input("Choose Your Colour:"))
 
     while True:
@@ -295,9 +370,9 @@ def colorInput(colorDictionary):
 
 #------------------------------------ User Radius Input is a Number Validation ---------------------------------------#
 
-def radiusInput(): # My circleCoord() function creates a circle using the metric system, 
-                   # I must therefore convert my nautical miles to meters,
-                   # 1 nautical mile = 1852 meters
+def radiusInput():                                              # My circleCoord() function creates a circle using the metric system, 
+                                                                # I must therefore convert my nautical miles to meters,
+                                                                # 1 nautical mile = 1852 meters
     while True:
         num = input("Enter Radius in Nautical Miles: \n")
         try:
@@ -319,6 +394,7 @@ def radiusInput(): # My circleCoord() function creates a circle using the metric
 #------------------------------------ User Auto or Manual Input Validation ---------------------------------------#
 
 def autoOrManualFunc():
+
     resetPrompt = str(input("Press A For Automatic Refresh \nPress M for Manual Refresh : "))
     while True:
         if resetPrompt != "A" and resetPrompt != "M":       # User input incorrect --> stay in While loop
@@ -329,9 +405,10 @@ def autoOrManualFunc():
 
 
     
-#------------------------------------ Choose Refresh Rate of Selenium ---------------------------------------#
+#------------------------------------ Choose Refresh Rate of Selenium (in seconds)---------------------------------------#
 
-def sleepInput(autoOrManual):
+def sleepInputSec(autoOrManual):
+
     if autoOrManual == "A":
         while True:
             num = input("I want to Refresh every ... seconds ")
@@ -346,13 +423,51 @@ def sleepInput(autoOrManual):
     elif autoOrManual == "M":
         return
 
+
+#------------------------------------ Choose Refresh Rate of Selenium (in seconds)---------------------------------------#
+
+def sleepInputMin(autoOrManual):
+
+    if autoOrManual == "A":
+        while True:
+            num = input("I want to Refresh every ... minutes ")
+            try:
+                val = int(num)*60
+                print("Refresh Rate in minutes : ", num)   # User input can only be an integer 
+                val = val
+                break
+            except ValueError:
+                print("Please select an Integer : ")
+        return val
+    elif autoOrManual == "M":
+        return
+
+
+
+
+#------------------------------------ Choose NB of Boats---------------------------------------#
+
+def numberOfBoats():
+    
+    while True:
+        num = input("I want to plot ... boats: ")
+        try:
+            val = int(num)
+            print("Number of boats plotted : ", val)   # User input can only be an integer 
+            val = val
+            break
+        except ValueError:
+            print("Please select an Integer : ")
+    return val
+
+
 #------------------------------------ Print the GPRMC Decoded Data ---------------------------------------#
 
 def printDecodedData(decodedData): # Function to print the decoded GPRMC Data in the dictionary
     
     print("The Decoded GPRMC Sentence: \n")
     print("Longitude: %s" % decodedData["Longitude"])
-    print("Longitude: %s" % decodedData["Latitude"])
+    print("Latitude: %s" % decodedData["Latitude"])
     print("Time: %s %s" % (decodedData["Date"],decodedData["Time"]))
     
 
@@ -373,4 +488,85 @@ def clear():
     else: 
         __=system('clear') # If the program is run on a Mac 
 
+
+#------------------------------------ Initialize browser ---------------------------------------#  
+
+def browserInit():
+    print("Initialization :")
+    browser = webdriver.Chrome('C:\\Windows\chromedriver.exe')  # Directory of the Chrome Driver (Chrome Version 94)
+                                                                # Go to Chrome, Top right 3 dots, Help, About Google Chrome
+    browser.maximize_window()                                   # Open Window in Full Screen
+    browser.get('https://www.windy.com/uploader')               # Open Windy
+    time.sleep(6)
+    clear()                                                     # Removing the error message generated by the Chrome Driver 
+    return browser
+
+#------------------------------------ Initialize UDP Socket ---------------------------------------#  
+
+def socketInit():
+
+    global hostname 
+    global ip
+    global port
+
+    hostname = socket.gethostname()                         # Utilizing the Python Socket package 
+    ip = socket.gethostbyname(hostname)                     # Automatically retrieve the IP address of the computer
+    port = 504                                              # Can be any port 
+    print(f'Listening to IP:{ip} UDP Port:{port} \n')
+
+    return hostname,ip,port
+
+
+#------------------------------------ Initialize Global Variables ---------------------------------------#  
+
+def initGlobal():
+
+    global radius 
+    global listRadius 
+    global innerRadius
+    global circleColor
+    global autoOrManual
+    global sleepTime
+
+    radius = radiusInput()                      # Outer radius of the donut (user input)
+    listRadius = radiusMulticircles(radius)     # List of radius all the plotted circles
+    innerRadius = 300                           # Inner Radius of the donut (not a user input)                                        
+    circleColor = colorInput(colorDict() )      # Dictionary of colors in the user selection function
+    autoOrManual = autoOrManualFunc()           # User Manual or Auto selection function 
+    sleepTime = sleepInputSec(autoOrManual)     # User Sleep time selection function 
+
+    return radius,listRadius,innerRadius,circleColor,autoOrManual,sleepTime
+
+
+#------------------------------------ Read COM Port ---------------------------------------#  
+# COM Port = ...
+# Baudrate = 4800 
+
+
+
+def readCOM():
+    serialPort = serial.Serial(port="COM4",baudrate=4800)
+    stringOfData = ""
+    stringOfData = serialPort.readline()
+    stringOfData.decode("Ascii")
+    print(stringOfData)
+    # Wait until there is data waiting in the serial buffer
+    # if serialPort.in_waiting > 0:
+    #     # Read data out of the buffer until a carraige return / new line is found
+    #     stringOfData = serialPort.readline()
+    #     stringOfData.decode("Ascii")
+    #     print(stringOfData)
+        # if "hello" in stringOfData:
+        #     stringOfData.decode("Ascii")
+        #     print(stringOfData)
+    return stringOfData
+
+
+def writeCOM():
+    serialPort = serial.Serial(port="COM4",baudrate=4800)
+    # my_str = "hello world"
+    # my_str_as_bytes = str.encode(my_str)
+    # serialPort.write(my_str_as_bytes)
+    serialPort.write(b"yoyoyo")
+    return
 
