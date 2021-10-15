@@ -7,6 +7,7 @@ from datetime import datetime
 import socket
 import os
 import serial 
+import re
 
 
 #----------------------------------------------- Functions -------------------------------------------------#
@@ -30,9 +31,9 @@ def userOrGPS():
     return x
 
 
-#------------------------------------ User Lon Lat Input is a Number Validation ---------------------------------------#
+#------------------------------- User Lon Lat Input is a Number Validation (decimal degrees) ------------------------------------#
 
-def lonLatInput(stringLonOrLat,i):                                              # My circleCoord() function creates a circle using the metric system, 
+def lonLatInput(stringLonOrLat,i):                              # My circleCoord() function creates a circle using the metric system, 
                                                                 # I must therefore convert my nautical miles to meters,
                                                                 # 1 nautical mile = 1852 meters
     while True:
@@ -162,7 +163,7 @@ def kmlMultiBoats(N,nbBoats):
     multiBoat = kml.newmultigeometry(name="MultiPoint") 
     radius = radiusInput()                      # Outer radius of the donut (user input)
     listRadius = radiusMulticircles(radius)     # List of radius all the plotted circles  
-
+    circleColor = colorInput(colorDict())      # Dictionary of colors in the user selection function
     for i in range(0,nbBoats,1):
         lonBoat = lonLatInput('lon',i)
         latBoat = lonLatInput('lat',i)
@@ -173,7 +174,7 @@ def kmlMultiBoats(N,nbBoats):
             boatCircles.append(x)
             multiBoat.newpolygon(outerboundaryis=x,innerboundaryis=x)
             multiBoat.style.polystyle.fill = 0
-            multiBoat.style.linestyle.color = '99000000'
+            multiBoat.style.linestyle.color = circleColor
 
     kml.save("MyPolygon.kml")
     return 
@@ -253,35 +254,30 @@ def decodeGPRMC(stringGPRMC):
     
 
 
-def decodeLonLat(Lon,Lat,LonDir,LatDir):             # Decode lon and lat from GPRMC Sentence 
-    decodedData = {}                                 # Create an empty Dict that will be filled in by the functions below 
+#------------------------- Decode Longitude and Latitude from GPRMC Sentence (DDMM.mm to dd) -------------------------------#
 
-    if LonDir == "W":                                # Translate West and East Values with Neg and Poq Values respectively 
-        LonDir = -1
-    if LonDir == "E":
-        LonDir = 1
-    
-    for x in Lon:                                    # DDDMM.mm to dd
-        degree = float(Lon[:3])                        
-        minute = float(Lon[3:])
-        ddLon = LonDir*(degree + (minute/60))
-        ddLon = "{:.5f}".format(ddLon)               # Decimal places 
-        decodedData["Longitude"] = ddLon
-    # print(ddLon)
 
-    if LatDir == "S":                                # Translate South and North Values with Neg and Poq Values respectively
-        LonDir = -1
-    if LatDir == "N":
-        LatDir = 1
-    
-    for x in Lat:                                    # DDMM.mm to dd
-        degree = float(Lat[:2])
-        minute = float(Lat[2:])
-        ddLat = LatDir*(degree + (minute/60))
-        ddLat = "{:.5f}".format(ddLat)               # Decimal places 
-        decodedData["Latitude"] = ddLat
-    # print(ddLat)
-    return decodedData
+# def decodeLonLatUserInput(LonOrLat):                 # Decode lon and lat from User Input
+
+#     LonOrLat = str()
+
+#     for x in Lon:                                    # DDDMM.mm to dd
+#         degree = float(Lon[:3])                        
+#         minute = float(Lon[3:])
+#         ddLon = LonDir*(degree + (minute/60))
+#         ddLon = "{:.5f}".format(ddLon)               # Decimal places 
+#         decodedData["Longitude"] = ddLon
+#     # print(ddLon)
+
+
+#     for x in Lat:                                    # DDMM.mm to dd
+#         degree = float(Lat[:2])
+#         minute = float(Lat[2:])
+#         ddLat = LatDir*(degree + (minute/60))
+#         ddLat = "{:.5f}".format(ddLat)               # Decimal places 
+#         decodedData["Latitude"] = ddLat
+#     # print(ddLat)
+#     return decodedData
 
 
 #------------------------------------ Convert NMEA Date to UTC datetime ---------------------------------------#
@@ -531,7 +527,7 @@ def initGlobal():
     radius = radiusInput()                      # Outer radius of the donut (user input)
     listRadius = radiusMulticircles(radius)     # List of radius all the plotted circles
     innerRadius = 300                           # Inner Radius of the donut (not a user input)                                        
-    circleColor = colorInput(colorDict() )      # Dictionary of colors in the user selection function
+    circleColor = colorInput(colorDict())      # Dictionary of colors in the user selection function
     autoOrManual = autoOrManualFunc()           # User Manual or Auto selection function 
     sleepTime = sleepInputSec(autoOrManual)     # User Sleep time selection function 
 
